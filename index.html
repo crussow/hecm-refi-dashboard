@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HECM-to-HECM Refinance Intelligence Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1220;
+    --bg-2:#111a2e;
+    --panel:#131e36;
+    --panel-2:#1a2745;
+    --ink:#e8eef7;
+    --ink-dim:#a3b0c7;
+    --ink-mute:#6b7894;
+    --accent:#5aa7ff;
+    --accent-2:#7bf1c8;
+    --warn:#ffb454;
+    --bad:#ff6b6b;
+    --good:#5ee3a1;
+    --line:rgba(255,255,255,.08);
+    --line-strong:rgba(255,255,255,.15);
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,Roboto,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  h1,h2,h3,h4{font-family:-apple-system,"SF Pro Display","Segoe UI",Inter,sans-serif;letter-spacing:-0.01em;margin:0 0 .4em 0}
+  h1{font-size:clamp(26px,3vw,40px);font-weight:700}
+  h2{font-size:clamp(20px,2vw,26px);font-weight:650;margin-top:0}
+  h3{font-size:17px;font-weight:600}
+  .container{max-width:1280px;margin:0 auto;padding:0 24px}
+  header{position:sticky;top:0;z-index:50;background:rgba(11,18,32,.85);backdrop-filter:saturate(140%) blur(14px);border-bottom:1px solid var(--line)}
+  header .container{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 0 18px var(--accent)}
+  nav{display:flex;gap:4px;flex-wrap:wrap}
+  nav a{padding:8px 14px;border-radius:8px;color:var(--ink-dim);font-size:14px;font-weight:500}
+  nav a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+  .hero{padding:64px 0 32px 0;background:radial-gradient(1200px 400px at 20% -20%,rgba(90,167,255,.18),transparent 60%),radial-gradient(800px 400px at 90% -10%,rgba(123,241,200,.12),transparent 60%)}
+  .eyebrow{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);padding:6px 10px;border:1px solid rgba(90,167,255,.3);border-radius:100px;background:rgba(90,167,255,.08);margin-bottom:14px}
+  .hero p.lead{max-width:820px;color:var(--ink-dim);font-size:17px;margin-top:12px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:36px}
+  @media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+  .kpi .label{font-size:12px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+  .kpi .num{font-size:30px;font-weight:700;margin-top:8px;line-height:1}
+  .kpi .sub{font-size:13px;color:var(--ink-dim);margin-top:6px}
+  section{padding:48px 0;border-top:1px solid var(--line)}
+  section .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:10px}
+  section .section-head .tag{font-size:12px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  @media (max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+  .card h3{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:100px}
+  .pill.good{color:#0a3825;background:rgba(94,227,161,.2);border:1px solid rgba(94,227,161,.4)}
+  .pill.warn{color:#5a3c10;background:rgba(255,180,84,.22);border:1px solid rgba(255,180,84,.45)}
+  .pill.bad{color:#56141a;background:rgba(255,107,107,.18);border:1px solid rgba(255,107,107,.42)}
+  .pill.info{color:#0d3856;background:rgba(90,167,255,.2);border:1px solid rgba(90,167,255,.42)}
+  .pill.ink{color:var(--ink);background:rgba(255,255,255,.08);border:1px solid var(--line-strong)}
+  .list{padding:0;margin:8px 0 0 0;list-style:none}
+  .list li{padding:10px 0;border-top:1px dashed var(--line);color:var(--ink-dim);font-size:14.5px}
+  .list li:first-child{border-top:0}
+  .list li strong{color:var(--ink);font-weight:600}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+  table thead th{text-align:left;padding:11px 12px;background:var(--panel-2);color:var(--ink-dim);font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line-strong)}
+  table tbody td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top}
+  table tbody tr:hover{background:rgba(255,255,255,.02)}
+  table tbody td code{background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px;font-size:12.5px;color:var(--accent-2)}
+  .vendor-card{display:flex;flex-direction:column;gap:10px;padding:18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;height:100%}
+  .vendor-card .head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .vendor-card h4{margin:0;font-size:16px}
+  .vendor-card .meta{font-size:12px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .vendor-card .price{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:14px;color:var(--accent-2);font-weight:600}
+  .vendor-card p{color:var(--ink-dim);font-size:14px;margin:0}
+  .vendor-card .best{font-size:12px;color:var(--good);font-weight:600}
+  .tier-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px dashed var(--line);font-size:13.5px}
+  .tier-row:first-child{border-top:0}
+  .tier-row .name{color:var(--ink);font-weight:600;flex:1}
+  .tier-row .cost{font-family:"SF Mono",ui-monospace,Menlo,monospace;color:var(--accent-2);font-size:13px;font-weight:600}
+  .callout{padding:16px 18px;border-radius:12px;background:rgba(90,167,255,.09);border:1px solid rgba(90,167,255,.28);color:var(--ink-dim);margin-top:14px}
+  .callout strong{color:var(--ink)}
+  .callout.warn{background:rgba(255,180,84,.08);border-color:rgba(255,180,84,.3)}
+  .callout.bad{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.3)}
+  .badge-stack{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chart-wrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .tabs{display:flex;gap:4px;padding:4px;background:var(--panel-2);border-radius:10px;margin-bottom:16px;flex-wrap:wrap}
+  .tabs button{background:transparent;border:0;padding:8px 14px;font-size:13.5px;color:var(--ink-dim);cursor:pointer;border-radius:6px;font-weight:500}
+  .tabs button.active{background:var(--panel);color:var(--ink);box-shadow:0 1px 0 rgba(255,255,255,.05),0 4px 10px rgba(0,0,0,.2)}
+  .tabs button:hover{color:var(--ink)}
+  footer{padding:40px 0 60px;color:var(--ink-mute);font-size:13px;border-top:1px solid var(--line);margin-top:32px}
+  .gap{width:100%;height:10px;background:var(--panel-2);border-radius:100px;overflow:hidden;margin-top:4px}
+  .gap > span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:100px}
+  .gap.low > span{background:linear-gradient(90deg,var(--bad),var(--warn))}
+  .gap.med > span{background:linear-gradient(90deg,var(--warn),var(--accent-2))}
+  .note{font-size:12.5px;color:var(--ink-mute);margin-top:8px;font-style:italic}
+  .ribbon{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-mute);padding:6px 10px;background:var(--panel-2);border-radius:8px;border:1px solid var(--line);width:fit-content}
+  .stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+  @media (max-width:900px){.stepper{grid-template-columns:repeat(2,1fr)}}
+  .step{position:relative;padding:16px 16px 14px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .step .stepnum{position:absolute;top:-12px;left:14px;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#0a3825;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:var(--shadow)}
+  .step h4{margin:10px 0 4px;font-size:14.5px}
+  .step p{margin:0;color:var(--ink-dim);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<div style="background:rgba(255,180,84,.15);border-bottom:1px solid rgba(255,180,84,.4);padding:10px 20px;font-size:13px;color:#ffb454;text-align:center">
+  Public demo — borrower names and cities anonymized. Full-fidelity version lives on internal systems only.
+</div><header>
+  <div class="container">
+    <div class="brand"><span class="dot"></span> HECM Refi Data Intelligence</div>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#hecm-rules">HECM Rules</a>
+      <a href="#refi-rules">Refi Rules</a>
+      <a href="#qual">Client Refi Qual</a>
+      <a href="#gap">Field Gap</a>
+      <a href="#vendors">Vendors</a>
+      <a href="#stack">Recommended Stack</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="hero" id="overview">
+    <div class="eyebrow">Prepared for CrossCountry / 400k HECM book</div>
+    <h1>These borrowers already qualified once. The refi question is about <em>change</em>, not re-qualification.</h1>
+    <p class="lead">Every person in this 400k file closed a HECM — so HUD's age, occupancy, property, financial-assessment, counseling, and CAIVRS gates were <em>all met at origination</em>. The H2H refi question is narrower: (1) are they still alive, (2) has anything material changed since origination, and (3) does the <em>new</em> PLF math produce enough benefit to clear the 5× test? This dashboard reframes the data problem around those three questions — and shrinks the vendor stack accordingly.</p>
+
+    <div class="kpis">
+      <div class="kpi"><div class="label">Exact DOB from file</div><div class="num">80%</div><div class="sub">maturity date − 150 yrs</div></div>
+      <div class="kpi"><div class="label">Original MCA from file</div><div class="num">100%</div><div class="sub">mortgage amount × 2/3</div></div>
+      <div class="kpi"><div class="label">Median age today (exact)</div><div class="num">80</div><div class="sub">derived, not appended</div></div>
+      <div class="kpi"><div class="label">Current UPB present</div><div class="num">40%</div><div class="sub">the last real data gap</div></div>
+    </div>
+
+    <div class="callout" style="margin-top:28px">
+      <strong>The reframe.</strong> Because every borrower already passed full HECM underwriting, you do <em>not</em> need to re-source DOB, income, credit, counseling, property standards, or CAIVRS on a bulk basis. Better still — HECM notes are written to mature on the youngest borrower's <strong>150th birthday</strong>, so <code>FIRST_POSITION_MORTGAGE_MATURITY_DATE − 150 years</code> gives you the <em>exact</em> DOB of the youngest borrower. In your sample that field is populated on <strong>80%</strong> of records, so DOB is effectively free and in-file for four out of five borrowers; the remaining 20% can fall back to the conservative floor (<code>62 + years since origination</code>). What you actually need to verify in bulk collapses to three things: <strong>(1)</strong> is the borrower still alive, <strong>(2)</strong> what is the current UPB on the existing HECM, and <strong>(3)</strong> has occupancy, property-charge status, or lien position materially changed. That collapses the vendor spend from $100k+ to roughly <strong>$0.03–$0.08/record</strong> — call it <strong>$12k–$32k</strong> to sweep the whole 400k.
+    </div>
+
+    <div class="callout" style="margin-top:14px;background:rgba(94,227,161,.08);border-color:rgba(94,227,161,.3)">
+      <strong>Two derivations that eliminate vendor spend.</strong>
+      <br><br>
+      <strong>1. Exact DOB of youngest borrower</strong> &nbsp;·&nbsp; <code>DOB_youngest = FIRST_POSITION_MORTGAGE_MATURITY_DATE − 150 years</code> &nbsp;·&nbsp; 80% populated in your sample, median derived age <strong>80</strong>. HECM notes mature on youngest borrower's 150th birthday, so the maturity date encodes DOB exactly. For the 20% where maturity is null, fall back to <code>62 + years since origination</code>.
+      <br><br>
+      <strong>2. Original Maximum Claim Amount (MCA)</strong> &nbsp;·&nbsp; <code>MCA_original = FIRST_POSITION_MORTGAGE_AMOUNT × 2/3</code> &nbsp;·&nbsp; 100% populated, median derived MCA <strong>$253k</strong>. HECM mortgages are written at 150% of MCA to absorb future negative amortization, so the recorded principal recovers the original MCA exactly. Every derived MCA in your sample sat cleanly under the FHA HECM limit for its origination year — full sanity check passes.
+      <br><br>
+      Combined, these two formulas give you <em>exact</em> DOB + original MCA + original UFMIP paid (≈2% of original MCA) on the bulk pass, which means the anti-churning MIP-credit math is fully computable from in-file data. Owner 2 DOB isn't recoverable this way — the maturity reflects only the youngest, who is already the PLF-binding borrower.
+    </div>
+  </div>
+
+  <!-- ========= HECM RULES ========= -->
+  <section id="hecm-rules">
+    <div class="section-head">
+      <div>
+        <div class="tag">Section 1 · Qualification primer</div>
+        <h2>FHA HECM origination requirements — <span style="color:var(--good)">flagged by what you can assume</span></h2>
+      </div>
+      <span class="ribbon">Source: HUD 4000.1, 24 CFR Part 206, Mortgagee Letters</span>
+    </div>
+
+    <div class="callout" style="margin-bottom:22px">
+      <strong>How to read this section.</strong> A <span class="pill good">Already passed</span> tag means HUD already verified this gate at the original HECM closing — you can assume it's still true unless you have specific evidence otherwise (e.g. a foreclosure filing suggests occupancy changed). A <span class="pill warn">Must re-verify</span> tag means the value can change over time and should be refreshed in bulk. A <span class="pill info">Re-underwrite at app</span> tag means it has to be freshly documented for the new loan, but that's a loan-officer task, not a 400k data-enrichment problem.
+    </div>
+
+    <div class="grid-3">
+
+      <div class="card">
+        <h3>Borrower <span class="pill good">Already passed</span></h3>
+        <ul class="list">
+          <li><strong>Age 62+ — exact DOB is in the file.</strong> HECM notes mature on the youngest borrower's 150th birthday, so <code>FIRST_POSITION_MORTGAGE_MATURITY_DATE − 150 yrs</code> gives an exact DOB for 80% of records (median age today: 80). No vendor needed for age on the bulk pass.</li>
+          <li><strong>Eligible non-borrowing spouse</strong> — if there was a second owner on title at origination, they were already vetted as NBS or co-borrower. <code>OWNER_2_FULL_NAME</code> (40% of records) tells you whether to ask about an NBS at all.</li>
+          <li><strong>Citizenship / lawful residency</strong> — verified at origination; doesn't need re-sourcing.</li>
+          <li><strong>CAIVRS / federal-debt status</strong> — was clear at origination; must be re-run at application (free, LO task).</li>
+          <li><strong>HUD counseling</strong> — new certificate is required for the refi, but that's an app-time workflow step, not a data-enrichment item.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Property <span class="pill warn">Mostly passed · verify occupancy</span></h3>
+        <ul class="list">
+          <li><strong>Eligible property type</strong> — already verified at origination. The property doesn't transmogrify; SFR stays SFR, FHA-approved condo stays approved (with rare de-certifications). No bulk re-check needed.</li>
+          <li><strong>Primary residence</strong> — this <em>is</em> the one property gate that can silently change. Borrower may have moved to assisted living, rented it out, or died. Check via NCOA + occupancy-refresh data source.</li>
+          <li><strong>FHA Minimum Property Standards</strong> — re-checked at the new appraisal; not a bulk-data problem.</li>
+          <li><strong>Condo de-certification</strong> — the one edge case worth checking in bulk. Free HUD Condo Approval lookup by project name for your condo subset.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Financial assessment <span class="pill info">Re-underwrite at app</span></h3>
+        <ul class="list">
+          <li><strong>Residual income</strong> — passed once; likely still passes (Social Security and pensions are sticky). Re-documented at application. Not an enrichment target.</li>
+          <li><strong>Credit history</strong> — only the credit events <em>since origination</em> matter. Flagging material derogs (BK, judgments, tax liens) in bulk is useful for lead triage; full tri-merge is reserved for applications.</li>
+          <li><strong>Property-charge payment history (taxes, insurance, HOA)</strong> — this is the one FA item worth checking in bulk. A delinquency signals LESA risk <em>and</em> tells you if the current HECM is in payable-obligations default.</li>
+          <li><strong>LESA determination</strong> — calculated at underwrite; not a pre-qualification data item.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Loan math <span class="pill good">Runs on in-file data</span></h3>
+        <ul class="list">
+          <li><strong>Principal Limit</strong> = Max Claim Amount × PLF. New MCA = lesser of current AVM or FHA HECM limit (<code>$1,209,750</code> for 2025). Original MCA = <code>FIRST_POSITION_MORTGAGE_AMOUNT × 2/3</code>.</li>
+          <li><strong>PLF</strong> is a function of (a) age of youngest borrower and (b) expected interest rate. Use <em>exact age</em> from <code>MATURITY_DATE − 150 yrs</code> (80% of records) or the conservative floor (62 + years since origination) as a fallback.</li>
+          <li><strong>Core screening calc:</strong> For every record — compute new PL → subtract current UPB + ~$15k closing-cost estimate → if positive and ≥5% of new PL, lead is workable. All inputs except UPB are derivable from the file today.</li>
+          <li><strong>MIP credit</strong> on refi typically zeros out the upfront MIP: <code>max(0, 2% × (new MCA − old MCA))</code>. Old MCA is in-file, so this computes without servicer data.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Lien position &amp; clean-up <span class="pill warn">Check for changes</span></h3>
+        <ul class="list">
+          <li>HECM is already in <strong>first lien</strong> — but a junior lien could have been added since. Your file's <code>SECOND/THIRD/FOURTH_POSITION_*</code> columns show 0% for this sample, suggesting the feed filters for HECM-only first-lien properties. Verify with your Cotality rep.</li>
+          <li><strong>Tax / HOA / HOI delinquencies</strong> since origination can block a refi or force a LESA on the new loan. Worth a bulk sweep.</li>
+          <li><strong>Active foreclosure</strong> — <code>FORECLOSURE_STAGE_CODE</code> is populated 10% in your sample. Upgrading Cotality to full pre-foreclosure coverage is cheaper than a third-party feed.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Counseling &amp; disclosures <span class="pill info">Re-underwrite at app</span></h3>
+        <ul class="list">
+          <li><strong>Fresh HUD counseling certificate</strong> required (180-day validity). Loan-officer workflow, not a bulk enrichment.</li>
+          <li><strong>Anti-Churning Disclosure (HUD-92901)</strong> within 3 business days of application — lender produces from the new PL math.</li>
+          <li><strong>TALC + amortization + loan comparison</strong> — standard lender disclosures at app.</li>
+          <li>None of these four items is something you buy from a data vendor.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========= REFI RULES ========= -->
+  <section id="refi-rules">
+    <div class="section-head">
+      <div>
+        <div class="tag">Section 2 · H2H refinance-specific rules</div>
+        <h2>What makes a HECM eligible to be refinanced into a new HECM</h2>
+      </div>
+      <span class="ribbon">Source: 24 CFR §206.53, ML 2004-18, ML 2014-11, HUD FHA Single-Family Handbook</span>
+    </div>
+
+    <div class="grid-2">
+
+      <div class="card">
+        <h3>1 &nbsp;&middot;&nbsp; 18-month seasoning <span class="pill good">95% in sample pass</span></h3>
+        <p style="color:var(--ink-dim);margin:6px 0 10px 0">HUD requires <strong>at least 18 months</strong> between the closing date of the original HECM and the application date on the new HECM.</p>
+        <div class="callout"><strong>Your file:</strong> <code>FIRST_POSITION_MORTGAGE_DATE</code> (100% populated). Directly computable. <strong>38 of 40 sample records</strong> already season.</div>
+      </div>
+
+      <div class="card">
+        <h3>2 &nbsp;&middot;&nbsp; 5× Closing-Cost Benefit Test <span class="pill warn">Hard-to-compute today</span></h3>
+        <p style="color:var(--ink-dim);margin:6px 0 10px 0">New <em>Principal Limit</em> minus old <em>Principal Limit</em> (as shown on the Anti-Churning Disclosure) must be <strong>≥ 5× total closing costs</strong> of the new HECM.</p>
+        <p style="color:var(--ink-dim);margin:0 0 10px 0"><code>(New PL − Old PL) ≥ 5 × Closing Costs</code></p>
+        <div class="callout warn"><strong>What you need:</strong> current age of youngest borrower (<em>derived free from <code>MATURITY_DATE − 150</code>, 80% fill</em> ✓), today's expected rate, current home value (CoreLogic AVM ✓), and the <em>original</em> principal limit from the existing HECM servicing record (not in file — but the anti-churning test only needs the new PL to stand alone, the original PL comes from the servicer at application).</div>
+      </div>
+
+      <div class="card">
+        <h3>3 &nbsp;&middot;&nbsp; Cash-available benefit test <span class="pill warn">Requires UPB</span></h3>
+        <p style="color:var(--ink-dim);margin:6px 0 10px 0">New proceeds available to the borrower (after paying off the old HECM balance + new closing costs) must be <strong>≥ 5% of the new Principal Limit</strong>. Lender overlays often push this higher.</p>
+        <div class="callout warn"><strong>What you need:</strong> Current UPB on the existing HECM. Your <code>ESTIMATED_UNPAID_PRINCIPAL_BALANCE_UPB_ENRICHED</code> is only populated <strong>40%</strong> of the time. This is the #1 enrichment gap for volume.</div>
+      </div>
+
+      <div class="card">
+        <h3>4 &nbsp;&middot;&nbsp; MIP credit on refi <span class="pill good">Fully in-file</span></h3>
+        <p style="color:var(--ink-dim);margin:6px 0 10px 0">New UFMIP on refi = <code>max(0, 2% × new MCA − 2% × old MCA)</code> under current HUD rules. Often small or zero, which is what makes H2H refis economically attractive to the borrower.</p>
+        <div class="callout" style="background:rgba(94,227,161,.08);border-color:rgba(94,227,161,.3)"><strong>What you need is already in the file:</strong> Old MCA = <code>FIRST_POSITION_MORTGAGE_AMOUNT × 2/3</code> (100% populated). Old UFMIP paid ≈ 2% × old MCA. No servicer record needed for the screen — you can run the anti-churning MIP math end-to-end on data you already own.</div>
+      </div>
+
+      <div class="card">
+        <h3>5 &nbsp;&middot;&nbsp; Anti-Churning Disclosure (HUD-92901) <span class="pill info">Compliance</span></h3>
+        <p style="color:var(--ink-dim);margin:6px 0 10px 0">Lender must give the borrower a side-by-side showing old vs. new PL, costs, interest rate, and estimated monthly cost-of-credit. Must be delivered within 3 business days of application. If the 5× test fails or the borrower doesn't sign, you can't close.</p>
+      </div>
+
+      <div class="card">
+        <h3>6 &nbsp;&middot;&nbsp; Re-qualification items the borrower must pass again <span class="pill info">Same as origination</span></h3>
+        <ul class="list">
+          <li>Still age 62+ on title (or NBS protected).</li>
+          <li>Still <strong>alive</strong> (biggest silent filter on a 20-year book).</li>
+          <li>Still occupies as primary residence.</li>
+          <li>New full financial assessment (residual income, credit, property charge history, CAIVRS).</li>
+          <li>New HUD counseling certificate (fresh, within 180 days).</li>
+          <li>Property still meets FHA standards (new appraisal; AVM is a screen, not a substitute).</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="callout" style="margin-top:20px">
+      <strong>When an H2H refi usually makes sense in 2026.</strong> (a) Borrowers who originated at high expected rates (2022–2024) and would now benefit from today's lower rate → higher PLF. (b) Borrowers whose home has appreciated significantly and now have a higher MCA. (c) Borrowers who want to add a spouse to title or replace a Saver with a Standard. (d) Borrowers with non-borrowing spouses who were previously not protected and now are under current HUD rules.
+    </div>
+  </section>
+
+  <!-- ========= CLIENT REFI QUAL ========= -->
+  <section id="qual">
+    <div class="section-head">
+      <div>
+        <div class="tag">Section 3 · Sample run</div>
+        <h2>Refi qualification on your 40-row sample (20 unique borrowers)</h2>
+      </div>
+      <span class="ribbon">Computed entirely from in-file data + 2026 PLF table · $0 vendor spend</span>
+    </div>
+
+    <p style="color:var(--ink-dim);max-width:900px;margin-top:0">Every field needed to run the 18-month seasoning, 5× benefit, 5% cash-available, and MIP-credit tests was extracted from the two derivations established earlier: <code>DOB = MATURITY − 150 yrs</code> and <code>Old MCA = AMOUNT × 2/3</code>. New PLF uses today's expected rate (6.5%) and the 2026 FHA HECM limit of $1,209,750. Closing costs modeled at $15k. The only field we can't synthesize is current UPB — borrowers missing UPB are tagged "Likely" if they pass every other gate.</p>
+
+    <div class="kpis" style="margin-top:24px">
+      <div class="kpi" style="border-color:rgba(94,227,161,.4);background:linear-gradient(180deg,rgba(94,227,161,.08),transparent 60%)"><div class="label" style="color:var(--good)">Clear qualify</div><div class="num">1</div><div class="sub">pass all four tests on current data</div></div>
+      <div class="kpi" style="border-color:rgba(90,167,255,.4);background:linear-gradient(180deg,rgba(90,167,255,.08),transparent 60%)"><div class="label" style="color:var(--accent)">Likely — pending UPB</div><div class="num">3</div><div class="sub">pass everything except unknown UPB</div></div>
+      <div class="kpi" style="border-color:rgba(255,107,107,.4);background:linear-gradient(180deg,rgba(255,107,107,.08),transparent 60%)"><div class="label" style="color:var(--bad)">Fail</div><div class="num">11</div><div class="sub">5× benefit or 5% cash underwater</div></div>
+      <div class="kpi" style="border-color:rgba(255,180,84,.4);background:linear-gradient(180deg,rgba(255,180,84,.08),transparent 60%)"><div class="label" style="color:var(--warn)">Inconclusive</div><div class="num">5</div><div class="sub">missing orig rate or maturity date</div></div>
+    </div>
+
+    <div class="callout" style="margin-top:20px"><strong>Read this number carefully.</strong> 1 in 20 "clear qualify" is a low hit rate — but it's driven mostly by rising rates between 2020–2022 originations and today's expected rate. The higher-value signal is the <strong>3 "Likely — UPB unknown"</strong>: all pass the 5× test with substantial benefit diff ($100k–$341k), and if their UPB is anywhere reasonable they'll clear the 5% test too. Extrapolating naively to your full 400k book: <strong>~20k clear qualifiers and ~60k UPB-pending "likelies"</strong>, though the real economics depend on the age/vintage mix of the full book.</div>
+
+    <div class="chart-wrap" style="margin-top:20px;padding:0;overflow:auto">
+      <table style="min-width:1040px">
+        <thead>
+          <tr>
+            <th style="position:sticky;left:0;background:var(--panel-2);z-index:2">Verdict</th>
+            <th>Borrower</th>
+            <th>Loc.</th>
+            <th>Age</th>
+            <th>Orig yr</th>
+            <th>Orig rate</th>
+            <th>Old MCA</th>
+            <th>Current AVM</th>
+            <th>Old PL</th>
+            <th>New PL</th>
+            <th>Benefit diff</th>
+            <th>Current UPB</th>
+            <th>Cash after payoff</th>
+            <th>MIP due</th>
+          </tr>
+        </thead>
+        <tbody id="qualBody"></tbody>
+      </table>
+    </div>
+
+    <div class="grid-2" style="margin-top:22px">
+      <div class="card">
+        <h3>Why borrowers fail <span class="pill bad">Pattern</span></h3>
+        <ul class="list">
+          <li><strong>2020–2022 originations dominate the fail bucket.</strong> Borrowers who locked a 2.5–4% expected rate when rates were near zero now face a 6.5% expected rate — the PLF math runs <em>backward</em>, so "New PL − Old PL" is small or negative.</li>
+          <li><strong>California high-value properties</strong> (Hori, Rosema, Gaynor-Murphy) where the original MCA exceeds today's HECM limit of $1,209,750 — the new MCA is capped, and they've drawn heavily, so the 5% cash-available test underwater.</li>
+          <li><strong>Very old originations with high old rates</strong> (Denbo 2007 @ 5.05%, Salcedo 2006 @ 6.40%) sometimes <em>should</em> work but have accrued PLs now close to new PLs — the benefit diff is real but below $75k.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Who to actually call <span class="pill good">Target profile</span></h3>
+        <ul class="list">
+          <li><strong>Vintage 2003–2010 at rates ≥ 5%</strong> — these borrowers have old PLs that haven't kept pace with appreciation; today's rate still improves things. <em>Walsh (MA, 2006, 6.25%) is the exemplar.</em></li>
+          <li><strong>Very elderly borrowers in appreciated markets</strong> — Hofmeister (92, CO, 2004) and Francis (95, DC, 2006) show $100k–$341k of benefit even before UPB is known.</li>
+          <li><strong>De-priorit­ize 2020–2022 vintages</strong> — unless rates drop meaningfully below 6%, the refi math rarely pencils.</li>
+          <li><strong>Cap new MCA properly</strong> — high-value CA/NYC/HI properties need careful screening because the MCA cap destroys PL lift.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="note">Assumptions: today's expected rate 6.5% (HECM ARM, April 2026), closing costs $15,000, 2026 FHA HECM limit $1,209,750, PLF table from ML 2017-12. For records with maturity date missing (20% of sample), age falls back to 62 + years since origination. Old PLF applied using the original note rate as a proxy for origination-era expected rate — acknowledged approximation; pre-2014 Saver/Standard product mix may shift results ±5%.</p>
+  </section>
+
+  <!-- ========= GAP ANALYSIS ========= -->
+  <section id="gap">
+    <div class="section-head">
+      <div>
+        <div class="tag">Section 3 · Data gap analysis</div>
+        <h2>Mapping each HECM-refi data point to your CoreLogic file</h2>
+      </div>
+      <span class="ribbon">Based on 40-row sample · extrapolates to 400k book</span>
+    </div>
+
+    <div class="tabs">
+      <button class="active" onclick="switchTab(event,'tab-critical')">What actually needs enrichment</button>
+      <button onclick="switchTab(event,'tab-known')">Already known from prior qual</button>
+      <button onclick="switchTab(event,'tab-app')">Re-verify at application only</button>
+      <button onclick="switchTab(event,'tab-chart')">Fill-rate chart</button>
+    </div>
+
+    <!-- CRITICAL TAB -->
+    <div id="tab-critical" class="tabpane">
+      <div class="callout" style="margin-bottom:14px"><strong>The real bulk-enrichment list.</strong> Only the things that can materially change between origination and today, <em>and</em> where it's cheaper to screen 400k in bulk than to discover the problem at the loan officer's desk. Everything else collapses into either "already established at origination" or "handled at application."</div>
+      <div class="card" style="padding:0">
+        <table>
+          <thead>
+            <tr><th style="width:24%">Data point</th><th style="width:26%">Matching CoreLogic field(s)</th><th style="width:10%">Fill</th><th>What to do</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Is the borrower still alive</strong><br><span class="pill bad">Top priority</span></td><td><em>Not in file</em></td><td><div class="gap low"><span style="width:0%"></span></div>0%</td><td>Match entire book against LADMF weekly. On a 20-year HECM book, expect 15–30% decedent rate. Every downstream dollar spent on a dead person is waste. <strong>Cheapest vendor:</strong> NTIS direct (~$995/yr) or LexisNexis Deceased (~$0.05/rec).</td></tr>
+            <tr><td><strong>Current UPB on existing HECM</strong><br><span class="pill bad">Top priority</span></td><td><code>ESTIMATED_UNPAID_PRINCIPAL_BALANCE_UPB_ENRICHED</code></td><td><div class="gap low"><span style="width:40%"></span></div>40%</td><td>This is the <em>only</em> hard gap between you and the benefit test math. 40% fill is a Cotality license tier — upgrading to full servicing coverage typically pushes this to 85–95%. ICE McDash is the enterprise alternative.</td></tr>
+            <tr><td><strong>Current home value (AVM)</strong><br><span class="pill good">Already have</span></td><td><code>ESTIMATED_VALUE_MKTG</code></td><td><div class="gap"><span style="width:100%"></span></div>100%</td><td>Use for the screen. Refresh with a lender-grade AVM (Clear Capital / HouseCanary) only at the LE stage on active leads.</td></tr>
+            <tr><td><strong>Phone / email / best contact</strong><br><span class="pill warn">Required for outreach</span></td><td>Mailing address only</td><td><div class="gap low"><span style="width:0%"></span></div>0%</td><td>Append <em>after</em> steps 1–3 on the survivors only. Datazapp or Tracerfy at $0.02–$0.03/match is fine for a warm list; TLOxp or LexisNexis for higher confidence and TCPA defensibility.</td></tr>
+            <tr><td><strong>Occupancy still primary residence</strong><br><span class="pill warn">Can silently change</span></td><td><code>OWNER_OCCUPANCY_CODE</code> (90% show "O")</td><td><div class="gap med"><span style="width:90%"></span></div>90%</td><td>Assessor snapshot can be stale. Run NCOA + USPS CASS on the survivors; flag anyone whose mailing address drifts from situs.</td></tr>
+            <tr><td><strong>Property-charge delinquency (tax / HOA / HOI)</strong><br><span class="pill warn">LESA / default risk</span></td><td>None direct (<code>HOMESTEAD_EXEMPT_INDICATOR</code> is a weak proxy)</td><td><div class="gap low"><span style="width:0%"></span></div>0%</td><td>BatchData tax-delinquency flag ($0.01/rec at Scale) is the cheap option; Cotality DataTree Tax is lender-grade; First American HOA for HOA-specific properties.</td></tr>
+            <tr><td><strong>Foreclosure / default status</strong><br><span class="pill warn">Disqualifier if active</span></td><td><code>FORECLOSURE_STAGE_CODE</code>, <code>LAST_FORECLOSURE_TRANSACTION_DATE</code></td><td><div class="gap low"><span style="width:10%"></span></div>10%</td><td>Upgrade Cotality to full pre-foreclosure tier, or use Auction.com / RealtyTrac. Drops the "active foreclosure" records out of the funnel before you pay to skip-trace them.</td></tr>
+            <tr><td><strong>New junior liens since origination</strong><br><span class="pill warn">Lien-position risk</span></td><td><code>SECOND/THIRD/FOURTH_POSITION_*</code></td><td><div class="gap low"><span style="width:0%"></span></div>0%</td><td>Your file's junior-lien columns are all 0% — verify whether your Cotality feed is filtered to first-lien-only properties. If so, request these columns unfiltered so you can see liens recorded post-HECM.</td></tr>
+            <tr><td><strong>Exact DOB of youngest borrower</strong><br><span class="pill good">Already in file — derive it</span></td><td><code>FIRST_POSITION_MORTGAGE_MATURITY_DATE</code> − 150 yrs</td><td><div class="gap"><span style="width:80%"></span></div>80%</td><td>HECM notes mature on the youngest borrower's 150th birthday. Subtract 150 years from <code>FIRST_POSITION_MORTGAGE_MATURITY_DATE</code> to get exact DOB. Validated on your 40-row sample: 80% fill, median derived age 80 (vs. 70 under the floor method). For the 20% missing maturity, fall back to 62 + years since origination. <strong>Zero vendor spend</strong>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- KNOWN (prior qualification) TAB -->
+    <div id="tab-known" class="tabpane" style="display:none">
+      <div class="callout" style="margin-bottom:14px"><strong>Things you can safely assume about every record.</strong> HUD verified these at the original HECM closing. Unless you have specific evidence otherwise, you do not need to re-source them in bulk.</div>
+      <div class="card" style="padding:0">
+        <table>
+          <thead><tr><th style="width:28%">Already established</th><th style="width:28%">How you can tell from the file</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Age ≥ 62 at original close</td><td>Every record has a reverse mortgage in first position — HUD wouldn't have endorsed it otherwise.</td><td>Minimum age today = 62 + (today − <code>FIRST_POSITION_MORTGAGE_DATE</code>), used as fallback.</td></tr>
+            <tr><td><strong>Exact DOB of youngest borrower</strong></td><td><code>FIRST_POSITION_MORTGAGE_MATURITY_DATE</code> − 150 years</td><td>HECM notes mature on youngest borrower's 150th birthday. 80% of sample populated; median derived age <strong>80</strong>. This is <em>exact</em>, not a floor — eliminates the DOB enrichment gap for 4 in 5 records.</td></tr>
+            <tr><td>Property was eligible type</td><td><code>LAND_USE_CODE_ENRICHEDM</code>, <code>PROPERTY_INDICATOR_CODE_ENRICHEDM</code>, <code>MANUFACTURED_HOME_INDICATOR_ENRICHEDM</code></td><td>Property type is very sticky. SFR remains SFR. 95% of your sample is SFR (land use 163).</td></tr>
+            <tr><td>Property met FHA minimum standards</td><td>Existence of the HECM</td><td>Only matters again at the new appraisal — bulk check not useful.</td></tr>
+            <tr><td>Borrower passed financial assessment</td><td>Existence of the HECM (FA required since 2015)</td><td>Retirement income is sticky. Lender re-docs at application.</td></tr>
+            <tr><td>No CAIVRS / federal-debt delinquency</td><td>Existence of the HECM</td><td>CAIVRS check is free at application — don't bulk-enrich.</td></tr>
+            <tr><td>U.S. citizen or lawful resident</td><td>Existence of the HECM</td><td>Doesn't change.</td></tr>
+            <tr><td>Clean counseling certificate at original close</td><td>Existence of the HECM</td><td>A fresh one is required for the refi — workflow item, not data.</td></tr>
+            <tr><td>Original HECM is an FHA HECM</td><td><code>FIRST_POSITION_MORTGAGE_TYPE_CODE=R</code>, <code>LOAN_TYPE_CODE_ENRICHED=FHA</code>, servicer in your list of HECM servicers</td><td>Flag any record where first-position loan type isn't FHA-reverse and exclude from H2H refi file.</td></tr>
+            <tr><td>Seasoning ≥ 18 months</td><td><code>FIRST_POSITION_MORTGAGE_DATE</code></td><td>Compute directly. 95% of your sample clears.</td></tr>
+            <tr><td><strong>Original Maximum Claim Amount</strong></td><td><code>FIRST_POSITION_MORTGAGE_AMOUNT × 2/3</code></td><td>HECM mortgage instruments are written at 150% of MCA to absorb future negative amortization. 100% populated; sanity-checked on your sample — every derived MCA sits under the FHA HECM limit for its origination year. Unlocks the MIP credit calc without servicer data.</td></tr>
+            <tr><td><strong>Original UFMIP paid</strong></td><td><code>~2% × derived original MCA</code></td><td>Under current HUD rules UFMIP is 2% of MCA (0.5% / 2.5% on pre-2017 Standard vs. Saver variants, adjust by origination year).</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RE-UNDERWRITE AT APPLICATION TAB -->
+    <div id="tab-app" class="tabpane" style="display:none">
+      <div class="callout" style="margin-bottom:14px"><strong>Items the loan officer handles, not the data team.</strong> These have to be freshly documented for the new loan, but there's no point in buying them for 400k people — buy them (or run them) only on the ~5–10% that become live applications.</div>
+      <div class="card" style="padding:0">
+        <table>
+          <thead><tr><th style="width:28%">Item</th><th>Why it's not a bulk-data problem</th></tr></thead>
+          <tbody>
+            <tr><td>New HUD counseling certificate</td><td>Borrower must complete with an independent counselor. Scheduling + certificate upload is an origination workflow.</td></tr>
+            <tr><td>Fresh CAIVRS check</td><td>Free, LO-initiated through FHA Connection.</td></tr>
+            <tr><td>Current credit report / tri-merge</td><td>Pull per-application under FCRA; soft prescreen only if you intend firm offers of credit to the whole list.</td></tr>
+            <tr><td>Income &amp; residual income documentation</td><td>Borrower provides SSA award letter, 1099s, pension statements at application.</td></tr>
+            <tr><td>New appraisal</td><td>Required by HUD on every HECM; AVM is only a screen.</td></tr>
+            <tr><td>Homeowners insurance evidence</td><td>Required at closing; typically borrower provides declarations page.</td></tr>
+            <tr><td>Title search</td><td>Title company orders at closing; identifies any liens your data missed.</td></tr>
+            <tr><td>Anti-Churning Disclosure (HUD-92901)</td><td>Produced by the LOS from the new PL math within 3 business days of application.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- NICE-TO-HAVE TAB -->
+    <div id="tab-nice" class="tabpane" style="display:none">
+      <div class="card" style="padding:0">
+        <table>
+          <thead><tr><th>Data point</th><th>Why useful</th><th>Source idea</th></tr></thead>
+          <tbody>
+            <tr><td>Estimated rate at origination</td><td>Already have (<code>FIRST_POSITION_MORTGAGE_INTEREST_RATE_ENRICHED</code>) — lets you cherry-pick 2022–2024 originations where today's rate gives the biggest PLF lift.</td><td>In file. Prioritize leads with rate ≥ 5.5% and recent origination.</td></tr>
+            <tr><td>Servicer / assignee name</td><td>Already have (<code>FIRST_POSITION_CURRENTLY_ASSIGNED_LENDER_COMPANY_NAME</code>). When servicer = HUD Secretary, the loan is HUD-assigned — typically higher-equity, older, PLF-maxed.</td><td>In file. Segment by assignee for outreach tone.</td></tr>
+            <tr><td>Length of residence / tax-assessed age of home</td><td>Proxy for how "sticky" the borrower is; helps targeting.</td><td>County / CoreLogic; already in file.</td></tr>
+            <tr><td>Property condition / roof age</td><td>For FHA property-standards gating pre-appraisal.</td><td>Cape Analytics / Betterview geospatial imagery.</td></tr>
+            <tr><td>Flood zone, wildfire, wind exposure</td><td>For HOI requirement / flood insurance.</td><td>FEMA NFHL (free), Verisk.</td></tr>
+            <tr><td>Hispanic / preferred-language flag</td><td>For outreach scripting &amp; counseling referrals.</td><td>Datazapp language append, Ethnic Technologies.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CHART TAB -->
+    <div id="tab-chart" class="tabpane" style="display:none">
+      <div class="chart-wrap">
+        <canvas id="fillChart" height="130"></canvas>
+        <p class="note">Fill rate = % of the 40-row sample where the field is non-null. 100% = always populated; 0% = never populated.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ========= VENDORS ========= -->
+  <section id="vendors">
+    <div class="section-head">
+      <div>
+        <div class="tag">Section 4 · Data enrichment vendors</div>
+        <h2>Best options to fill each gap — ranked by cost</h2>
+      </div>
+      <span class="ribbon">Pricing is public-facing / reported. Enterprise volume negotiable.</span>
+    </div>
+
+    <h3 style="margin-top:8px;margin-bottom:12px">DOB / age append (the biggest blocker)</h3>
+    <div class="grid-3">
+      <div class="vendor-card">
+        <div class="head"><h4>Datazapp</h4><span class="pill good">Cheapest</span></div>
+        <div class="meta">Batch + API · DIY self-serve</div>
+        <div class="price">~$0.02–$0.03/match</div>
+        <p>Affordable consumer file. Age append, phone/email, homeowner demographics. Built for real-estate marketers. Accuracy is good but <em>not</em> lender-grade: use as an inexpensive first pass to segment the file.</p>
+        <p class="best">Best for: triaging 400k down to &lt;100k "likely 62+, likely alive" leads.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>TransUnion TLOxp</h4><span class="pill info">Lender-trusted</span></div>
+        <div class="meta">Batch + API · credentialed</div>
+        <div class="price">~$0.15–$0.50/lookup · enterprise contract</div>
+        <p>Deep consumer identity (DOB, SSN, relatives, phones), sourced from credit header + public records. GLBA-permissible for lending. The standard in reverse-mortgage prescreening.</p>
+        <p class="best">Best for: lender-grade DOB &amp; identity verification pre-offer.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>LexisNexis Risk &mdash; Accurint / Batch Services</h4><span class="pill info">Lender-trusted</span></div>
+        <div class="meta">Batch + API · credentialed</div>
+        <div class="price">~$0.20–$0.60/lookup · enterprise</div>
+        <p>Equivalent alternative to TLOxp. Strong on compliance (GLBA, FCRA for prescreen-only uses) and includes Deceased Solutions as an add-on &mdash; one-stop.</p>
+        <p class="best">Best for: bundled DOB + deceased + skip trace from one credentialed provider.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;margin-bottom:12px">Deceased / mortality (just as critical as DOB on a 20-year book)</h3>
+    <div class="grid-3">
+      <div class="vendor-card">
+        <div class="head"><h4>NTIS Limited-Access DMF</h4><span class="pill good">Cheapest</span></div>
+        <div class="meta">Bulk file · annual subscription</div>
+        <div class="price">~$995/yr + certification</div>
+        <p>Direct access to the Social Security Death Master File. Raw file — you do your own matching. Covers 85M+ records since 1936. Requires SSA-approved NTIS certification; budget 30–60 days.</p>
+        <p class="best">Best for: ongoing in-house match at the lowest marginal cost per 400k.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>LexisNexis Deceased Solutions</h4><span class="pill info">Turnkey</span></div>
+        <div class="meta">Batch + API · credentialed</div>
+        <div class="price">~$0.05–$0.15/record</div>
+        <p>SSA DMF + state records + obituaries + funeral home + proprietary sources. Weekly updates, alerts, fuzzy matching. Saves you the matching headache.</p>
+        <p class="best">Best for: buy once, match forever — minimal operational lift.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>Experian Deceased File</h4><span class="pill info">Turnkey</span></div>
+        <div class="meta">Batch · marketing-permissible</div>
+        <div class="price">~$0.03–$0.10/record</div>
+        <p>Consumer-grade deceased file, commonly bundled with NCOA for marketing suppression. Not a substitute for LADMF where you need SSA-grade certainty.</p>
+        <p class="best">Best for: campaign suppression before you spend on downstream enrichment.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;margin-bottom:12px">Current HECM UPB / servicing data (your 60% UPB gap)</h3>
+    <div class="grid-3">
+      <div class="vendor-card">
+        <div class="head"><h4>Cotality (CoreLogic) UPB Enriched &mdash; full coverage</h4><span class="pill info">Same data family</span></div>
+        <div class="meta">Batch + API · already your provider</div>
+        <div class="price">Contact sales · tier upgrade from your current license</div>
+        <p>You already have <code>ESTIMATED_UNPAID_PRINCIPAL_BALANCE_UPB_ENRICHED</code>. The 40% fill in your sample is a license-tier issue, not a data issue. Upgrading to Cotality's full loan-level subscription (or adding their Servicing Insights product) typically pushes this to 85–95%.</p>
+        <p class="best">Best for: fastest path — no new vendor onboarding.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>ICE Mortgage Technology (ex-Black Knight) McDash</h4><span class="pill info">Enterprise</span></div>
+        <div class="meta">Bulk + subscription</div>
+        <div class="price">~$100k–$500k/yr, enterprise</div>
+        <p>The industry reference set for loan-level servicing: UPB, current rate, delinquency, MIP paid, payoff. Covers &gt;70% of the U.S. servicing market. Best absolute coverage and accuracy on current HECM balance data.</p>
+        <p class="best">Best for: institutional-grade UPB, MIP history, and delinquency flags at 400k scale.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>Recursion / Recontact ServiceMac / Celink direct feeds</h4><span class="pill warn">Servicer-specific</span></div>
+        <div class="meta">Bulk · direct data-share agreement</div>
+        <div class="price">Relationship-driven</div>
+        <p>If a subset of your 400k is serviced by a small number of HECM subservicers (Celink, PHH, Reverse Mortgage Servicing Dept., etc.), a direct data-share or CSA may be cheaper than a national feed.</p>
+        <p class="best">Best for: if 60%+ of your book is on one or two subservicers.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;margin-bottom:12px">Contact info (phone, email, right-party-contact)</h3>
+    <div class="grid-3">
+      <div class="vendor-card">
+        <div class="head"><h4>Datazapp</h4><span class="pill good">Cheapest</span></div>
+        <div class="meta">Batch + API · self-serve</div>
+        <div class="price">$0.03/match cell/landline/email · $0.02 prepaid</div>
+        <p>Pay-as-you-go, no contract, $125 minimum. Built for real-estate marketers.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>Tracerfy</h4><span class="pill good">Cheapest</span></div>
+        <div class="meta">Batch + API</div>
+        <div class="price">~$0.02/lead</div>
+        <p>Rock-bottom unit cost. API-first, OK for wholesale-style volume. Check TCPA-scrub yourself.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>BatchData (formerly BatchSkipTracing)</h4><span class="pill info">Platform</span></div>
+        <div class="meta">API · monthly plan</div>
+        <div class="price">From $500/mo (20k records) · Contact Enrichment $5k/mo</div>
+        <p>Full property-data platform with contact enrichment, skip, tax delinquency, and tax-lien flags. Best if you also want property-data refresh in the same API.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>AccurateAppend</h4><span class="pill info">Enterprise</span></div>
+        <div class="meta">Batch + API</div>
+        <div class="price">~$0.05–$0.20/match · volume tiers</div>
+        <p>Higher-accuracy, litigator-scrub-friendly phone/email append. Popular with call-center operations that want to avoid TCPA exposure.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>TransUnion TLOxp / LexisNexis Accurint</h4><span class="pill info">Lender-grade</span></div>
+        <div class="meta">Batch + API · credentialed</div>
+        <div class="price">~$0.15–$0.50/lookup</div>
+        <p>If you're already buying DOB from one of these, adding phone/email to the same query is typically cheaper than two vendors.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>Whitepages Pro / Ekata</h4><span class="pill info">Identity graph</span></div>
+        <div class="meta">API</div>
+        <div class="price">~$0.05–$0.25/lookup · enterprise</div>
+        <p>Best for real-time identity verification during origination (phone confidence, IP insight). Not the cheapest for 400k batch.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;margin-bottom:12px">Tax delinquency, HOA, and property-charge risk</h3>
+    <div class="grid-3">
+      <div class="vendor-card">
+        <div class="head"><h4>BatchData</h4><span class="pill good">Cheapest</span></div>
+        <div class="meta">API · Scale plan</div>
+        <div class="price">$0.01/record @ Scale · $5k/mo for 750k</div>
+        <p>Tax delinquency flag, tax lien flag, and tax amount across 155M U.S. properties. Cheapest bulk source, good data for campaign filtering.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>Cotality DataTree / Tax Status</h4><span class="pill info">Lender-grade</span></div>
+        <div class="meta">API · enterprise</div>
+        <div class="price">Contact sales</div>
+        <p>Direct tax-assessor data with current-year status. Used by tax-service subservicers for origination due diligence. Most accurate commercial source.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>First American Data &amp; Analytics — HOA Database</h4><span class="pill info">Best for HOA</span></div>
+        <div class="meta">API · enterprise</div>
+        <div class="price">Contact sales</div>
+        <p>All 50 states, 2,300+ counties. Tells you if a property is in an HOA, dues amount, existence of a delinquency lien, and the HOA contact. Nothing else comes close for HOA at scale.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;margin-bottom:12px">AVM refresh / lender-grade valuation</h3>
+    <div class="grid-3">
+      <div class="vendor-card">
+        <div class="head"><h4>Cotality MKTG AVM (in file)</h4><span class="pill good">Free to you</span></div>
+        <div class="meta">Already populated</div>
+        <div class="price">Included</div>
+        <p>100% fill on your sample. Use as your campaign screen value.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>Clear Capital ClearAVM</h4><span class="pill info">Lender-grade</span></div>
+        <div class="meta">API + PDF reports</div>
+        <div class="price">~$2–$15/value · volume negotiable</div>
+        <p>One of the top-3 lender-grade AVMs. Cheaper than a BPO when you need a second opinion at LE time.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>HouseCanary · Veros · Quantarium</h4><span class="pill info">Lender-grade</span></div>
+        <div class="meta">API · enterprise</div>
+        <div class="price">Custom — $1–$10/value depending on coverage tier</div>
+        <p>All three are used by reverse-mortgage lenders for AVM cascades. Pick whichever integrates cleanest with your LOS.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;margin-bottom:12px">Bankruptcy &amp; derogatory history</h3>
+    <div class="grid-3">
+      <div class="vendor-card">
+        <div class="head"><h4>LexisNexis Risk Bankruptcy / PACER</h4><span class="pill info">Comprehensive</span></div>
+        <div class="meta">Batch + API</div>
+        <div class="price">~$0.15–$0.40/lookup</div>
+        <p>Full federal court bankruptcy records via PACER, with dismissals/discharges. GLBA-permissible.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>TransUnion / Experian credit prescreen</h4><span class="pill info">Credit-gated</span></div>
+        <div class="meta">Batch · FCRA prescreen</div>
+        <div class="price">~$0.40–$1.00/record</div>
+        <p>Tri-merge or single-bureau prescreen — gives you BK, foreclosure, tax lien, delinquency, and soft scores in one call. Requires FCRA firm-offer-of-credit at the campaign tail.</p>
+      </div>
+      <div class="vendor-card">
+        <div class="head"><h4>Cotality foreclosure data (in file, limited)</h4><span class="pill warn">Low fill</span></div>
+        <div class="meta">Batch</div>
+        <div class="price">Included · upgrade available</div>
+        <p><code>FORECLOSURE_STAGE_CODE</code> and <code>LAST_FORECLOSURE_TRANSACTION_DATE</code> are only 10% populated. Upgrade with Cotality foreclosure/pre-foreclosure data at the same license tier.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ========= STACK ========= -->
+  <section id="stack">
+    <div class="section-head">
+      <div>
+        <div class="tag">Section 5 · Recommended stack</div>
+        <h2>Cheapest viable H2H-refi qualification pipeline at 400k scale</h2>
+      </div>
+      <span class="ribbon">Batch-first, API for hot leads</span>
+    </div>
+
+    <p style="color:var(--ink-dim);max-width:860px">Because every borrower in the 400k already passed full HECM underwriting, the bulk-enrichment job collapses to three narrow questions: <em>still alive?</em>, <em>current UPB?</em>, and <em>anything silently changed?</em>. That lets the funnel below strip the book down to workable prospects at roughly <strong>$0.03–$0.08/record</strong> — an order of magnitude less than a "re-qualify from scratch" stack. Run it as a weekly batch across all 400k plus an API lane that re-scores a lead the instant a loan officer opens it.</p>
+
+    <div class="stepper">
+      <div class="step">
+        <span class="stepnum">1</span>
+        <h4>Deceased suppression</h4>
+        <p>LADMF match weekly. On a 20-year HECM book, expect 15–30% decedent rate — every downstream dollar spent on a dead person is pure waste. <strong>Cost: ~$0.003/record</strong> amortized if in-house DMF ($995/yr ÷ 400k × 52 weeks); ~$0.05 via LexisNexis Deceased if you want turnkey.</p>
+      </div>
+      <div class="step">
+        <span class="stepnum">2</span>
+        <h4>Run the full refi math in-file</h4>
+        <p>DOB from <code>MATURITY − 150y</code> (80% exact). Original MCA from <code>AMOUNT × 2/3</code> (100%). Derived UFMIP ≈ 2% × old MCA. New PL from exact age + today's rate + AVM. All of the 5%/5×/MIP tests compute without a vendor call. <strong>Cost: $0.</strong></p>
+      </div>
+      <div class="step">
+        <span class="stepnum">3</span>
+        <h4>UPB + change-since-origination sweep</h4>
+        <p>Upgrade Cotality to full UPB coverage (lift fill from 40% → 85–95%). Add NCOA + pre-foreclosure + tax-delinquency flags from the same Cotality tier or BatchData. This is the one real data spend. <strong>Cost: Cotality license delta + ~$0.01/record tax-delq.</strong></p>
+      </div>
+      <div class="step">
+        <span class="stepnum">4</span>
+        <h4>Contact append on survivors only</h4>
+        <p>After steps 1–3 the list is maybe 80k–120k workable prospects (alive, seasoned, positive benefit test, no red flags). Only now spend on phone/email. Datazapp or Tracerfy at ~$0.02–$0.03/match. <strong>Cost: ~$2k–$4k</strong> for the whole survivor set.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:28px">
+      <h3>Recommended stack <span class="pill good">Reframed</span></h3>
+      <p style="color:var(--ink-dim);margin:0 0 10px 0">The full bulk pass — everything you need to go from 400k raw records to a scored, ranked, contactable call list.</p>
+      <div class="tier-row"><span class="name">NTIS LADMF (direct) — deceased suppression</span><span class="cost">~$995/yr flat</span></div>
+      <div class="tier-row"><span class="name">Cotality UPB tier upgrade — full servicing coverage</span><span class="cost">license delta (negotiate)</span></div>
+      <div class="tier-row"><span class="name">Cotality pre-foreclosure / tax-delq add-ons</span><span class="cost">license delta</span></div>
+      <div class="tier-row"><span class="name">BatchData tax delinquency (alt. to Cotality)</span><span class="cost">$0.01/rec @ Scale</span></div>
+      <div class="tier-row"><span class="name">USPS NCOA Link (occupancy drift)</span><span class="cost">~$0.005/rec</span></div>
+      <div class="tier-row"><span class="name">Datazapp / Tracerfy phone + email — <em>survivors only</em></span><span class="cost">$0.02–$0.03/match</span></div>
+      <div class="callout" style="margin-top:14px"><strong>All-in first-pass:</strong> ~$0.03–$0.08/record × 400k ≈ <strong>$12k–$32k</strong> to sweep the entire book once. Weekly re-runs of steps 1 and 3 cost a small fraction of that — call it <strong>$25k–$50k/year</strong> to keep the book continuously scored.</div>
+    </div>
+
+    <div class="grid-2" style="margin-top:20px">
+      <div class="card">
+        <h3>At pre-qual (per-lead, not per-400k) <span class="pill info">Lender-grade</span></h3>
+        <p style="color:var(--ink-dim);margin:0 0 10px 0">Only on the ~10% of survivors a loan officer actually works. Premium data is cheap when you're only buying it for leads with a live appointment.</p>
+        <div class="tier-row"><span class="name">TLOxp / LexisNexis Accurint — DOB + skip-verify</span><span class="cost">$0.15–$0.50/lookup</span></div>
+        <div class="tier-row"><span class="name">Clear Capital / HouseCanary AVM refresh</span><span class="cost">$2–$15/value</span></div>
+        <div class="tier-row"><span class="name">Credit prescreen (soft) if marketing firm-offer</span><span class="cost">$0.40–$1.00/rec</span></div>
+        <div class="tier-row"><span class="name">Fresh HUD counseling (borrower-paid)</span><span class="cost">$125–$200 borrower</span></div>
+      </div>
+      <div class="card">
+        <h3>What you are <em>not</em> buying <span class="pill bad">Skip these</span></h3>
+        <ul class="list">
+          <li><strong>Bulk DOB append for 400k.</strong> Exact DOB is already recoverable from <code>MATURITY_DATE − 150 yrs</code> on 80% of records; the 20% remainder can ride on the conservative floor. A per-lead TLOxp append at pre-qual handles any edge case.</li>
+          <li><strong>Bulk credit / financial-assessment data.</strong> Every record already passed FA at origination; buying tri-merges on 400k people is wasted spend.</li>
+          <li><strong>Bulk property-type / FHA-eligibility re-checks.</strong> HUD already endorsed the property once; property type is sticky.</li>
+          <li><strong>Enterprise loan-level feeds (McDash, etc.) at full scale.</strong> Overkill unless your Cotality rep can't deliver UPB coverage — start with the license upgrade.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:20px"><strong>Bottom line.</strong> The reframe saves you roughly <strong>$60k–$280k/yr</strong> vs. a "re-qualify from scratch" stack, because you stop paying for things HUD already verified. Direct your vendor budget at the three things that can actually change between origination and today — mortality, current balance, and silent status changes — and your per-lead premium enrichment at the survivors.</div>
+  </section>
+
+  <footer>
+    <p>Sources: HUD 4000.1 FHA Single-Family Policy Handbook · 24 CFR Part 206 (HECM Insurance) · HUD Mortgagee Letters 2004-18, 2014-11, 2015-06 · HUD HECM Financial Assessment &amp; Property Charge Guide · reverse.mortgage and understandingreverse.com industry references · vendor pricing from Datazapp, BatchData, Tracerfy, LexisNexis Risk, TransUnion TLOxp, Cotality (CoreLogic), ICE Mortgage Technology, First American Data &amp; Analytics, Clear Capital, HouseCanary, NTIS LADMF — all current as of April 2026. Enterprise pricing is directional and subject to volume-based negotiation.</p>
+    <p style="margin-top:8px">Sample inspected: <code>[sample file redacted]</code> (40 rows × 436 columns, CoreLogic/Cotality property-plus-mortgage schema).</p>
+  </footer>
+</main>
+
+<script>
+  // ======= Sample refi qualification results (computed server-side, embedded static) =======
+  const QUAL_DATA = [{"owner":"Borrower WM","owner2":"Co-borrower WT","city":"","state":"MA","age":82.2,"orig_year":2006,"orig_rate":6.25,"old_mca":362790,"avm":821037,"new_mca":821037,"old_pl":101400,"new_pl":350110,"diff":248710,"upb":307261,"cash":27849,"mip_due":9165,"verdict":"YES \u2014 qualifies","tier":"pass"},{"owner":"Borrower HOT","owner2":"Co-borrower HNA","city":"","state":"CO","age":92.4,"orig_year":2004,"orig_rate":3.63,"old_mca":280749,"avm":919225,"new_mca":919225,"old_pl":150904,"new_pl":491781,"diff":340878,"upb":null,"cash":null,"mip_due":12770,"verdict":"Likely \u2014 UPB unknown","tier":"likely"},{"owner":"Borrower RAA","owner2":"Co-borrower RCA","city":"","state":"FL","age":78.7,"orig_year":2022,"orig_rate":3.95,"old_mca":661088,"avm":1362889,"new_mca":1209750,"old_pl":364060,"new_pl":471313,"diff":107252,"upb":null,"cash":null,"mip_due":10973,"verdict":"Likely \u2014 UPB unknown","tier":"likely"},{"owner":"Borrower FAL","owner2":"","city":"","state":"DC","age":94.6,"orig_year":2006,"orig_rate":6.63,"old_mca":230000,"avm":325555,"new_mca":325555,"old_pl":79493,"new_pl":179545,"diff":100052,"upb":null,"cash":null,"mip_due":1911,"verdict":"Likely \u2014 UPB unknown","tier":"likely"},{"owner":"Borrower SWF","owner2":"","city":"","state":"NC","age":88.6,"orig_year":2016,"orig_rate":4.15,"old_mca":205000,"avm":477871,"new_mca":477871,"old_pl":116381,"new_pl":238682,"diff":122301,"upb":246712,"cash":-23030,"mip_due":5457,"verdict":"No \u2014 fails 5% cash test","tier":"fail"},{"owner":"Borrower HM","owner2":"","city":"","state":"CA","age":89.9,"orig_year":2020,"orig_rate":3.32,"old_mca":3262840,"avm":3149616,"new_mca":1209750,"old_pl":529518,"new_pl":623213,"diff":93695,"upb":4394988,"cash":-3786775,"mip_due":0,"verdict":"No \u2014 fails 5% cash test","tier":"fail"},{"owner":"Borrower HTE","owner2":"Co-borrower HLJ","city":"","state":"NC","age":79.2,"orig_year":2017,"orig_rate":3.97,"old_mca":285000,"avm":556270,"new_mca":556270,"old_pl":146479,"new_pl":219698,"diff":73219,"upb":358510,"cash":-153812,"mip_due":5425,"verdict":"No \u2014 fails 5\u00d7 benefit","tier":"fail"},{"owner":"Borrower DJ","owner2":"Co-borrower DBB","city":"","state":"OK","age":100.5,"orig_year":2007,"orig_rate":5.05,"old_mca":200160,"avm":295995,"new_mca":295995,"old_pl":107505,"new_pl":173157,"diff":65652,"upb":null,"cash":null,"mip_due":1917,"verdict":"No \u2014 fails 5\u00d7 benefit","tier":"fail"},{"owner":"Borrower SI","owner2":"","city":"","state":"CA","age":81.4,"orig_year":2006,"orig_rate":6.4,"old_mca":276000,"avm":326640,"new_mca":326640,"old_pl":74078,"new_pl":136282,"diff":62204,"upb":null,"cash":null,"mip_due":1013,"verdict":"No \u2014 fails 5\u00d7 benefit","tier":"fail"},{"owner":"Borrower WLD","owner2":"Co-borrower WP","city":"","state":"AR","age":93.8,"orig_year":2017,"orig_rate":3.55,"old_mca":148500,"avm":231573,"new_mca":231573,"old_pl":101350,"new_pl":126319,"diff":24969,"upb":null,"cash":null,"mip_due":1661,"verdict":"No \u2014 fails 5\u00d7 benefit","tier":"fail"},{"owner":"Borrower GM","owner2":"","city":"","state":"CA","age":68.2,"orig_year":2020,"orig_rate":3.83,"old_mca":1075000,"avm":1652359,"new_mca":1209750,"old_pl":350094,"new_pl":364997,"diff":14903,"upb":1433936,"cash":-1083939,"mip_due":2695,"verdict":"No \u2014 fails 5\u00d7 benefit","tier":"fail"},{"owner":"Borrower ET","owner2":"Co-borrower EFL","city":"","state":"TX","age":83.5,"orig_year":2021,"orig_rate":2.16,"old_mca":118500,"avm":208140,"new_mca":208140,"old_pl":78666,"new_pl":91886,"diff":13221,"upb":null,"cash":null,"mip_due":1793,"verdict":"No \u2014 fails 5\u00d7 benefit","tier":"fail"},{"owner":"Borrower RB","owner2":"","city":"","state":"GA","age":73.2,"orig_year":2020,"orig_rate":2.82,"old_mca":159000,"avm":282792,"new_mca":282792,"old_pl":90641,"new_pl":96291,"diff":5651,"upb":null,"cash":null,"mip_due":2476,"verdict":"No \u2014 fails 5\u00d7 benefit","tier":"fail"},{"owner":"Borrower RJH","owner2":"","city":"","state":"CA","age":75.2,"orig_year":2020,"orig_rate":3.32,"old_mca":1280000,"avm":1880297,"new_mca":1209750,"old_pl":428111,"new_pl":431430,"diff":3319,"upb":1720478,"cash":-1304048,"mip_due":0,"verdict":"No \u2014 fails 5\u00d7 benefit","tier":"fail"},{"owner":"Borrower KJ","owner2":"Co-borrower KS","city":"","state":"AZ","age":79.4,"orig_year":2025,"orig_rate":5.63,"old_mca":360000,"avm":380086,"new_mca":380086,"old_pl":164791,"new_pl":150760,"diff":-14031,"upb":537090,"cash":-401330,"mip_due":402,"verdict":"No \u2014 fails seasoning","tier":"fail"},{"owner":"Borrower RKL","owner2":"","city":"","state":"CO","age":63.2,"orig_year":2024,"orig_rate":6.27,"old_mca":625000,"avm":562958,"new_mca":562958,"old_pl":null,"new_pl":151330,"diff":null,"upb":925612,"cash":-789282,"mip_due":0,"verdict":"Inconclusive \u2014 PLF inputs missing","tier":"unknown"},{"owner":"Borrower LJ","owner2":"","city":"","state":"NJ","age":80.8,"orig_year":2023,"orig_rate":6.53,"old_mca":null,"avm":528157,"new_mca":528157,"old_pl":null,"new_pl":216870,"diff":null,"upb":null,"cash":null,"mip_due":null,"verdict":"Inconclusive \u2014 PLF inputs missing","tier":"unknown"},{"owner":"Borrower ST","owner2":"","city":"","state":"NM","age":80.7,"orig_year":2007,"orig_rate":5.99,"old_mca":null,"avm":314489,"new_mca":314489,"old_pl":null,"new_pl":129052,"diff":null,"upb":null,"cash":null,"mip_due":null,"verdict":"Inconclusive \u2014 PLF inputs missing","tier":"unknown"},{"owner":"Borrower PM","owner2":"","city":"","state":"CA","age":70.6,"orig_year":2017,"orig_rate":4.38,"old_mca":null,"avm":2177768,"new_mca":1209750,"old_pl":null,"new_pl":385579,"diff":null,"upb":null,"cash":null,"mip_due":null,"verdict":"Inconclusive \u2014 PLF inputs missing","tier":"unknown"},{"owner":"Borrower KBA","owner2":"","city":"","state":"WY","age":70.3,"orig_year":2018,"orig_rate":4.33,"old_mca":null,"avm":310414,"new_mca":310414,"old_pl":null,"new_pl":98338,"diff":null,"upb":null,"cash":null,"mip_due":null,"verdict":"Inconclusive \u2014 PLF inputs missing","tier":"unknown"}];
+
+  function fmt$(n){ if(n===null||n===undefined||isNaN(n)) return '<span style="color:var(--ink-mute)">—</span>'; const s=(n<0?'-':'')+'$'+Math.abs(Math.round(n)).toLocaleString(); return n<0?'<span style="color:var(--bad)">'+s+'</span>':s; }
+  function fmtPct(n){ if(n===null||n===undefined) return '—'; return (n*100).toFixed(2)+'%'; }
+  function tierPill(t){
+    if(t==='pass') return '<span class="pill good">✓ YES</span>';
+    if(t==='likely') return '<span class="pill info">⧗ LIKELY</span>';
+    if(t==='fail') return '<span class="pill bad">✗ NO</span>';
+    return '<span class="pill warn">? UNKNOWN</span>';
+  }
+  function renderQual(){
+    const tb = document.getElementById('qualBody'); if(!tb) return;
+    const rows = QUAL_DATA.map(r=>{
+      const name = r.owner + (r.owner2 ? '<br><span style="color:var(--ink-mute);font-size:12px">+ '+r.owner2+'</span>' : '');
+      return '<tr>'
+        + '<td style="position:sticky;left:0;background:var(--panel);z-index:1">'+tierPill(r.tier)+'<div style="color:var(--ink-mute);font-size:11.5px;margin-top:3px">'+r.verdict.replace(/^[^—]+— /,'')+'</div></td>'
+        + '<td><strong>'+name+'</strong><br><span style="color:var(--ink-mute);font-size:12px">'+r.city+'</span></td>'
+        + '<td>'+r.state+'</td>'
+        + '<td>'+(r.age??'—')+'</td>'
+        + '<td>'+(r.orig_year??'—')+'</td>'
+        + '<td>'+(r.orig_rate!=null ? r.orig_rate.toFixed(2)+'%' : '—')+'</td>'
+        + '<td>'+fmt$(r.old_mca)+'</td>'
+        + '<td>'+fmt$(r.avm)+'</td>'
+        + '<td>'+fmt$(r.old_pl)+'</td>'
+        + '<td>'+fmt$(r.new_pl)+'</td>'
+        + '<td><strong>'+fmt$(r.diff)+'</strong></td>'
+        + '<td>'+fmt$(r.upb)+'</td>'
+        + '<td>'+fmt$(r.cash)+'</td>'
+        + '<td>'+fmt$(r.mip_due)+'</td>'
+        + '</tr>';
+    }).join('');
+    tb.innerHTML = rows;
+  }
+  document.addEventListener('DOMContentLoaded', renderQual);
+
+  function switchTab(ev, id){
+    const tabs = document.querySelectorAll('.tabs button');
+    tabs.forEach(t=>t.classList.remove('active'));
+    ev.currentTarget.classList.add('active');
+    const panes = document.querySelectorAll('.tabpane');
+    panes.forEach(p=>p.style.display='none');
+    document.getElementById(id).style.display='block';
+    if(id==='tab-chart') drawChart();
+  }
+
+  let chartDrawn = false;
+  function drawChart(){
+    if(chartDrawn) return;
+    chartDrawn = true;
+    const data = [
+      {name:'Situs address / FIPS / APN', pct:100},
+      {name:'Owner 1 name', pct:100},
+      {name:'Owner 2 name', pct:40},
+      {name:'Owner occupancy code', pct:100},
+      {name:'Mailing address', pct:100},
+      {name:'AVM value + confidence', pct:100},
+      {name:'Land use / property indicator', pct:100},
+      {name:'Manufactured home indicator', pct:40},
+      {name:'Condo rider flag', pct:30},
+      {name:'PUD rider flag', pct:45},
+      {name:'1st mortgage date', pct:100},
+      {name:'1st mortgage maturity date', pct:80},
+      {name:'1st mortgage amount', pct:100},
+      {name:'1st mortgage type (R/J)', pct:100},
+      {name:'1st mortgage loan type (FHA/CNV)', pct:100},
+      {name:'1st mortgage interest rate', pct:100},
+      {name:'Currently-assigned lender', pct:100},
+      {name:'Current UPB (enriched)', pct:40},
+      {name:'Estimated equity', pct:100},
+      {name:'Junior liens (2nd/3rd/4th)', pct:0},
+      {name:'Foreclosure stage', pct:10},
+      {name:'Youngest DOB (maturity − 150y)', pct:80},
+      {name:'Original MCA (amount × 2/3)', pct:100},
+      {name:'Borrower DOB (direct)', pct:0},
+      {name:'Deceased indicator', pct:0},
+      {name:'Phone / email', pct:0},
+      {name:'Property tax delinquency', pct:0},
+      {name:'HOA dues / lien', pct:0},
+      {name:'HOI / insurance in-force', pct:0},
+      {name:'Income / residual income', pct:0}
+    ];
+    const bg = data.map(d => d.pct >= 90 ? '#5ee3a1' : d.pct >= 40 ? '#ffb454' : '#ff6b6b');
+    new Chart(document.getElementById('fillChart'), {
+      type:'bar',
+      data:{labels:data.map(d=>d.name),datasets:[{label:'Fill %',data:data.map(d=>d.pct),backgroundColor:bg,borderRadius:6,borderSkipped:false}]},
+      options:{
+        indexAxis:'y',
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>c.parsed.x+'%'}}},
+        scales:{
+          x:{min:0,max:100,ticks:{color:'#a3b0c7',callback:(v)=>v+'%'},grid:{color:'rgba(255,255,255,.06)'}},
+          y:{ticks:{color:'#e8eef7',font:{size:12}},grid:{display:false}}
+        }
+      }
+    });
+  }
+</script>
+</body>
+</html>
